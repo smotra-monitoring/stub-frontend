@@ -11,7 +11,7 @@ stub-frontend/
 ├── README.md           # This file
 ├── .github/
 │   └── copilot-instructions.md  # AI agent instructions
-├── deploy/
+├── deployments/
 │   ├── Dockerfile      # Docker build configuration
 │   └── nginx.conf      # Nginx configuration
 ├── docs/
@@ -73,7 +73,7 @@ tsc src/main.ts --outDir public/dist --target ES2020 --watch
 ### Build the Docker Image
 
 ```bash
-docker build -f deploy/Dockerfile -t smotra-frontend .
+docker build -f deployments/Dockerfile -t smotra-frontend .
 ```
 
 ### Run the Container
