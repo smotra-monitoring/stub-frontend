@@ -70,7 +70,7 @@ jobs:
             BUILD_VERSION=${{ github.sha }}
             BUILD_REPO=${{ steps.vars.outputs.BUILD_REPO }}
             BUILD_RELEASE_NUMBER=${{ steps.vars.outputs.BUILD_RELEASE_NUMBER }}
-          target: app
+          # target: app
           push: true
           tags: |
             ghcr.io/${{ github.repository_owner }}/${{ steps.vars.outputs.BUILD_REPO }}:${{ steps.vars.outputs.BUILD_RELEASE }}
