@@ -1,7 +1,7 @@
 FROM nginx:alpine
 
 # Copy nginx configuration
-COPY deploy/nginx.conf /etc/nginx/nginx.conf
+COPY  deployments/nginx.conf /etc/nginx/nginx.conf
 
 # Copy all static files from public/ directory
 COPY public/ /usr/share/nginx/html/
