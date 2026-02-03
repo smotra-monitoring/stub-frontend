@@ -1,0 +1,36 @@
+# Git files
+.git/
+.gitignore
+.github/
+
+# Documentation (not needed in container)
+docs/
+*.md
+!README.md
+
+# Source files (only compiled JS needed)
+src/
+
+# Development files
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+*.log
+
+# IDE files
+.vscode/
+.idea/
+*.sublime-project
+*.sublime-workspace
+
+# OS files
+.DS_Store
+Thumbs.db
+*~
+*.swp
+*.swo
+
+# Build artifacts (we copy public/ which already has compiled output)
+dist/
+build/

@@ -1,0 +1,182 @@
+/* Custom styles for Smotra marketing website */
+/* This file is optional - most styling is handled by Bulma */
+
+:root {
+    --primary: #00d1b2;
+    --danger: #f14668;
+    --link: #485fc7;
+    --info: #3e8ed0;
+}
+
+/* Light theme (default) */
+:root,
+[data-theme="light"] {
+    --bg-color: #ffffff;
+    --text-color: #363636;
+    --card-bg: #ffffff;
+    --section-bg: #fafafa;
+    --hero-gradient-start: #00d1b2;
+    --hero-gradient-end: #3e8ed0;
+    --box-shadow: rgba(0, 0, 0, 0.1);
+    --border-color: #dbdbdb;
+}
+
+/* Dark theme */
+[data-theme="dark"] {
+    --bg-color: #1a1a1a;
+    --text-color: #f5f5f5;
+    --card-bg: #2a2a2a;
+    --section-bg: #0d0d0d;
+    --hero-gradient-start: #00a896;
+    --hero-gradient-end: #2b6cb0;
+    --box-shadow: rgba(0, 0, 0, 0.3);
+    --border-color: #404040;
+}
+
+/* System preference detection */
+@media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+        --bg-color: #1a1a1a;
+        --text-color: #f5f5f5;
+        --card-bg: #2a2a2a;
+        --section-bg: #0d0d0d;
+        --hero-gradient-start: #00a896;
+        --hero-gradient-end: #2b6cb0;
+        --box-shadow: rgba(0, 0, 0, 0.3);
+        --border-color: #404040;
+    }
+}
+
+/* Apply theme colors */
+body {
+    background-color: var(--bg-color);
+    color: var(--text-color);
+    transition: background-color 0.3s ease, color 0.3s ease;
+}
+
+.card,
+.box {
+    background-color: var(--card-bg);
+    color: var(--text-color);
+    border: 1px solid var(--border-color);
+    transition: background-color 0.3s ease, border-color 0.3s ease;
+}
+
+.section {
+    background-color: var(--section-bg);
+    transition: background-color 0.3s ease;
+}
+
+.section.has-background-light,
+.section.has-background-white-ter {
+    background-color: var(--section-bg) !important;
+}
+
+[data-theme="dark"] .section.has-background-info-light,
+[data-theme="dark"] .section.has-background-warning-light {
+    background-color: rgba(62, 142, 208, 0.15) !important;
+}
+
+[data-theme="dark"] .notification.is-info.is-light {
+    background-color: rgba(62, 142, 208, 0.2);
+    color: #a8d8ff;
+}
+
+[data-theme="dark"] .box.has-background-light {
+    background-color: var(--card-bg) !important;
+}
+
+[data-theme="dark"] .box.has-background-white {
+    background-color: var(--card-bg) !important;
+}
+
+[data-theme="dark"] .box.has-background-success-light {
+    background-color: rgba(72, 199, 142, 0.2) !important;
+}
+
+[data-theme="dark"] .box.has-background-info-light {
+    background-color: rgba(62, 142, 208, 0.2) !important;
+}
+
+[data-theme="dark"] .box.has-background-primary-light {
+    background-color: rgba(0, 209, 178, 0.2) !important;
+}
+
+[data-theme="dark"] .footer {
+    background-color: var(--card-bg);
+}
+
+/* Fix titles and text visibility in dark mode */
+[data-theme="dark"] .title,
+[data-theme="dark"] .subtitle,
+[data-theme="dark"] .content p,
+[data-theme="dark"] .content li,
+[data-theme="dark"] .content strong {
+    color: var(--text-color) !important;
+}
+
+[data-theme="dark"] .has-text-grey {
+    color: #b5b5b5 !important;
+}
+
+/* Theme toggle button */
+.theme-toggle {
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    z-index: 1000;
+    width: 50px;
+    height: 50px;
+    border-radius: 50%;
+    border: 2px solid var(--border-color);
+    background-color: var(--card-bg);
+    color: var(--text-color);
+    cursor: pointer;
+    box-shadow: 0 4px 8px var(--box-shadow);
+    transition: all 0.3s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.5rem;
+}
+
+.theme-toggle:hover {
+    transform: scale(1.1);
+    box-shadow: 0 6px 12px var(--box-shadow);
+}
+
+/* Smooth scrolling */
+html {
+    scroll-behavior: smooth;
+}
+
+/* Custom hero gradient (optional) */
+.hero.is-primary {
+    background: linear-gradient(135deg, var(--primary) 0%, var(--info) 100%);
+}
+
+/* Card hover effect */
+.card {
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 8px 16px rgba(0, 0, 0, 0.1);
+}
+
+/* Icon text alignment */
+.icon-text {
+    align-items: center;
+}
+
+/* Responsive spacing adjustments */
+@media screen and (max-width: 768px) {
+    .title.is-1 {
+        font-size: 2.5rem;
+    }
+
+    .subtitle.is-3 {
+        font-size: 1.5rem;
+    }
+}
