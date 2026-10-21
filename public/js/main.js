@@ -106,8 +106,12 @@
 
             scene.addEventListener('pointermove', (e) => {
                 const r = scene.getBoundingClientRect();
-                targetSpin = BASE_SPIN + ((e.clientX - r.left) / r.width - 0.5) * 24;
-                targetTilt = BASE_TILT - ((e.clientY - r.top) / r.height - 0.5) * 14;
+                const px = (e.clientX - r.left) / r.width - 0.5;
+                const py = (e.clientY - r.top) / r.height - 0.5;
+                // Turntable feel: horizontal drag spins one way above centre, the other way below, blending smoothly across the middle
+                const side = Math.max(-1, Math.min(1, -py * 4));
+                targetSpin = BASE_SPIN + px * 24 * side;
+                targetTilt = BASE_TILT - py * 14;
                 kick();
             });
             scene.addEventListener('pointerleave', () => {

@@ -862,7 +862,7 @@ ol {
     top: 38%;
     width: 1040px;
     height: 700px;
-    margin: -350px 0 0 -520px;
+    margin: -350px 0 0 -490px;
     transform-style: preserve-3d;
     transform: scale3d(var(--s), var(--s), var(--s)) rotateX(var(--tilt)) rotateZ(var(--spin));
     will-change: transform;
