@@ -696,7 +696,6 @@ ol {
 }
 
 .section__head {
-    max-width: 44rem;
     margin-bottom: clamp(2.5rem, 5vw, 3.5rem);
 }
 
