@@ -292,11 +292,22 @@ ol {
 .brand__logo {
     width: 30px;
     height: 30px;
-    transition: transform 0.8s var(--ease);
+    overflow: visible;
 }
 
-.brand:hover .brand__logo {
-    transform: rotate(90deg);
+.brand__pulse {
+    stroke-dasharray: 1;
+    stroke-dashoffset: 0;
+}
+
+.brand:hover .brand__pulse {
+    animation: trace 1.1s var(--ease);
+}
+
+@keyframes trace {
+    from {
+        stroke-dashoffset: 1;
+    }
 }
 
 .nav__menu {
