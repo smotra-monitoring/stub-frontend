@@ -27,7 +27,7 @@ The project includes a ready-to-use development configuration that uses SQLite:
 
 ```bash
 # Run with the provided dev config
-go run cmd/server/main.go -c configs/dev.yaml
+go run cmd/api-server/main.go -c configs/dev.yaml
 
 # Or use justfile
 just run
@@ -48,7 +48,7 @@ curl http://localhost:8080/healthz/ready
 curl http://localhost:8080/healthz/live
 
 # API info
-curl http://localhost:8080/api/v1
+curl http://localhost:8080/v1
 ```
 
 ### 4. Agent Claiming Workflow
@@ -92,7 +92,9 @@ curl http://localhost:8080/agents/019c1234-5678-7abc-def0-123456789abc/claim-sta
 # { "status": "pending" }
 ```
 
-#### Administrator Claims Agent (requires OAuth2 - coming soon)
+#### Administrator Claims Agent (requires OAuth2)
+
+See [docs/features/authentication.md](authentication.md) for the full OAuth2 setup. Once authenticated, an admin can claim a pending agent:
 
 ```bash
 # Admin claims pending agent via web UI or API
@@ -107,7 +109,55 @@ curl -X POST http://localhost:8080/agents/claim \
   }'
 ```
 
-### 5. Using PostgreSQL (Production)
+### 5. Submit Monitoring Results
+
+Once an agent has a valid API key it can submit monitoring results in batches. Each result must have a client-assigned UUIDv7 ID — the server uses it for idempotent deduplication (submitting the same ID twice inserts the row only once).
+
+```bash
+curl -X POST http://localhost:8080/v1/agent/019c1234-5678-7abc-def0-123456789abc/results \
+  -H "Content-Type: application/json" \
+  -H "X-Agent-API-Key: sk_live_..." \
+  -d '{
+    "results": [
+      {
+        "id": "019d0000-0001-7000-8000-000000000001",
+        "endpointId": "019c9999-1111-7000-8000-000000000001",
+        "timestamp": "2026-05-12T10:00:00Z",
+        "checkType": "ping",
+        "result": {
+          "successLatencies": [12.3, 11.8, 13.1],
+          "packetsSent": 3,
+          "packetsReceived": 3,
+          "errors": []
+        }
+      }
+    ]
+  }'
+```
+
+Supported `checkType` values: `ping`, `httpget`, `tcpconnect`, `udpconnect`, `traceroute`, `plugin`.
+
+See [monitoring-results.md](monitoring-results.md) for the full request/response schema.
+
+### 6. Agent Heartbeat
+
+Agents send a heartbeat at regular intervals to report system vitals. The server updates `last_seen_at` and stores a vitals snapshot for every heartbeat.
+
+```bash
+curl -X POST http://localhost:8080/v1/agent/019c1234-5678-7abc-def0-123456789abc/heartbeat \
+  -H "Content-Type: application/json" \
+  -H "X-Agent-API-Key: sk_live_..." \
+  -d '{
+    "cpuUsagePercent": 12.5,
+    "memoryUsagePercent": 45.2,
+    "agentVersion": "1.0.0",
+    "uptimeSeconds": 86400
+  }'
+```
+
+Returns `204 No Content` on success.
+
+### 7. Using PostgreSQL (Production)
 
 Edit your `config.yaml` file:
 
@@ -134,7 +184,7 @@ postgres_config:
 Then start the server:
 
 ```bash
-CONFIG_FILE=config.yaml go run cmd/server/main.go
+CONFIG_FILE=config.yaml go run cmd/api-server/main.go
 ```
 
 ## Configuration
@@ -156,10 +206,6 @@ Both YAML and JSON formats are supported.
 server:
   host: 0.0.0.0
   port: 8080
-  read_timeout: 15s
-  write_timeout: 15s
-  idle_timeout: 2m
-  shutdown_timeout: 30s
   environment: development
 
 database_type: sqlite
@@ -169,8 +215,6 @@ sqlite_config:
     type: sqlite
     maxopenconns: 25
     maxidleconns: 5
-    connmaxlifetime: 15m
-    connmaxidletime: 5m
   filepath: ./data/smotra.db
 
 logging:
@@ -178,8 +222,11 @@ logging:
   format: json
 
 auth:
-  jwt_secret: development-secret-change-in-production
-  jwt_expiration: 24h
+  server_callback_url: http://localhost:8080/v1/auth/oauth2/callback
+  frontend_callback_url: http://localhost:3000/auth/callback
+  providers:
+    github:
+      client_id: your-github-client-id
 ```
 
 **Production Configuration (configs/prod.yaml):**
@@ -187,10 +234,6 @@ auth:
 server:
   host: 0.0.0.0
   port: 8080
-  read_timeout: 30s
-  write_timeout: 30s
-  idle_timeout: 2m
-  shutdown_timeout: 30s
   environment: production
 
 database_type: postgres
@@ -214,8 +257,11 @@ logging:
   format: json
 
 auth:
-  jwt_secret: ""  # Required - set via environment variable
-  jwt_expiration: 24h
+  server_callback_url: https://api.example.com/v1/auth/oauth2/callback
+  frontend_callback_url: https://app.example.com/auth/callback
+  providers:
+    google:
+      client_id: ""  # Required — set in config or environment
 ```
 
 ### Configuration Fields
@@ -258,8 +304,10 @@ auth:
 - `format`: json or text
 
 #### Authentication
-- `jwt_secret`: JWT signing secret (required in production)
-- `jwt_expiration`: JWT token expiration duration (default: 24h)
+- See [docs/features/authentication.md](authentication.md) for full OAuth2/OIDC configuration reference.
+- `auth.server_callback_url`: Public URL of this server's `/v1/auth/oauth2/callback` endpoint
+- `auth.frontend_callback_url`: Frontend URL to redirect to after IDP callback
+- `auth.providers`: Map of provider name to OAuth2 configuration
 
 ## Building for Production
 
@@ -268,7 +316,7 @@ auth:
 just build
 
 # Or manually
-go build -ldflags "-X main.version=1.0.0" -o bin/smotra-server cmd/server/main.go
+go build -ldflags "-X main.version=1.0.0" -o bin/smotra-server cmd/api-server/main.go
 
 # Run the binary with config file
 ./bin/smotra-server -c configs/prod.yaml
@@ -358,15 +406,18 @@ server/
 │   └── oapi-codegen.yaml   # oapi-codegen configuration
 ├── bin/                    # Compiled binaries (gitignored)
 ├── data/                   # Database files for SQLite (gitignored)
+├── docs/                   # Documentation
+│   ├── README.md          # Concise GitHub-friendly overview
+│   ├── GUIDE.md           # This file - comprehensive guide
+│   ├── TESTING.md         # Testing documentation
+│   └── ROADMAP.md         # Planned features and improvements
 ├── examples/               # Example code
 │   └── config/             # Configuration examples
 ├── script/                 # Build and deployment scripts
 ├── go.mod                  # Go module definition
 ├── go.sum                  # Go module checksums
 ├── justfile               # Build automation (just command runner)
-├── LICENSE                # License file
-├── README.md              # This file
-└── TESTING.md             # Testing documentation
+└── LICENSE                # License file
 ```
 
 ## Current Features
@@ -398,12 +449,12 @@ server/
 
 ### API
 - **OpenAPI 3.0**: API specification maintained in separate [smotra-monitoring/openapi](https://github.com/smotra-monitoring/openapi) repository
-- **Dual Router Architecture**: Separates monitoring endpoints (root) from business logic (`/api/v1`)
+- **Dual Router Architecture**: Separates monitoring endpoints (root) from business logic (`/v1`)
   - **Root Endpoints**: `/healthz`, `/metrics` - No versioning, infrastructure monitoring
-  - **Versioned Endpoints**: `/api/v1/*` - Core business logic with API versioning
+  - **Versioned Endpoints**: `/v1/*` - Core business logic with API versioning
 - **Tag-Based Code Generation**: Two oapi-codegen configs generate separate packages:
   - `api/oapi-codegen-root.yaml` → `internal/api/health/` (health tag)
-  - `api/oapi-codegen-prefixed.yaml` → `internal/api/v1/` (current tag, excludes health)
+  - `api/oapi-codegen-prefixed.yaml` → `internal/v1/` (current tag, excludes health)
 - **Strict Handlers**: Uses OpenAPI strict handler pattern for type safety
 - **Authentication**: Agent API key authentication via `X-Agent-API-Key` header
 - **Future-Proof**: Clean separation allows adding `/api/v2` without conflicts
@@ -442,7 +493,7 @@ cargo install just
 1. Define API endpoints in the [smotra-monitoring/openapi](https://github.com/smotra-monitoring/openapi) repository
 2. Regenerate API code: `just generate-oapi`
 3. Implement handlers in `internal/handlers/` following the strict handler pattern
-4. Routes are automatically registered via `api.HandlerFromMux()` in `cmd/server/main.go`
+4. Routes are automatically registered via `api.HandlerFromMux()` in `cmd/api-server/main.go`
 5. Add unit tests and integration tests for your handlers
 6. Update metrics collection if appropriate (see Metrics section in copilot-instructions.md)
 7. Run `just all` to verify everything builds
@@ -459,13 +510,13 @@ just generate-oapi
 # Root-level endpoints (/healthz, /metrics)
 oapi-codegen -config=api/oapi-codegen-root.yaml api/openapi/api/spec.yaml
 
-# Versioned API endpoints (/api/v1/*)
+# Versioned API endpoints (/v1/*)
 oapi-codegen -config=api/oapi-codegen-prefixed.yaml api/openapi/api/spec.yaml
 ```
 
 **Generated Packages:**
 - `internal/api/health/api.gen.go` - Health and metrics handlers (root level)
-- `internal/api/v1/api.gen.go` - Versioned API handlers (/api/v1)
+- `internal/v1/api.gen.go` - Versioned API handlers (/v1)
 
 **Tag Strategy:**
 - Endpoints tagged with `health` → root level package
@@ -555,7 +606,7 @@ If you see an error about missing configuration file:
 
 ```bash
 # Specify the config file path with -c flag
-go run cmd/server/main.go -c configs/dev.yaml
+go run cmd/api-server/main.go -c configs/dev.yaml
 
 # Or when running the binary
 ./bin/smotra-server -c configs/prod.yaml
@@ -597,30 +648,96 @@ go mod download
 - `GET /metrics` - Prometheus metrics endpoint exposing server and application metrics
 
 ### API v1
-- `GET /api/v1` - API version information
+- `GET /v1` - API version information
 
 ### Agent Configuration
 - `GET /agent/{agentId}/configuration` - Retrieve agent-specific configuration including monitoring settings, endpoints, and tags (requires `X-Agent-API-Key` header)
 
+### Agent Registration and Claiming
+- `POST /agent/register` - Agent self-registration (unclaimed agents)
+- `GET /agent/{agentId}/claim-status` - Poll claim status and receive API key (one-time)
+- `POST /agent/claim` - Administrator claims a pending agent (requires OAuth2)
+
+### Monitoring Data Submission
+- `POST /agent/{agentId}/results` - Submit a batch of monitoring check results (requires `X-Agent-API-Key` header)
+
+Agents POST a `BatchMonitoringResults` object containing an array of `MonitoringResult` items to report check outcomes. Each result is identified by a client-assigned UUIDv7 (`id`) used for server-side deduplication — re-sending the same batch is safe.
+
+**Supported check types** (discriminated by the `type` field):
+| type | Child table | Notes |
+|------|-------------|-------|
+| `ping` | `ping_check_results` | ICMP ping, includes per-latency histogram |
+| `httpget` | `http_get_check_results` | HTTP/S GET with status code and response time |
+| `tcpconnect` | `tcp_connect_check_results` | TCP connection probe |
+| `udpconnect` | `udp_connect_check_results` | UDP probe |
+| `traceroute` | `traceroute_check_results` + `traceroute_hops` | Full hop-by-hop path data |
+| `plugin` | `plugin_check_results` | Arbitrary plugin data as JSON blob |
+
+**Example request:**
+```json
+POST /v1/agent/{agentId}/results
+X-Agent-API-Key: <api-key>
+Content-Type: application/json
+
+{
+  "results": [
+    {
+      "id": "019d6abc-0000-7000-8000-000000000001",
+      "agent_id": "<agentId>",
+      "timestamp": "2026-04-08T10:00:00Z",
+      "target": { "address": "dns.google", "tags": [] },
+      "check_type": {
+        "type": "ping",
+        "result": {
+          "resolved_ip": "8.8.8.8",
+          "successes": 5,
+          "failures": 0,
+          "avg_response_time_ms": 12.5,
+          "success_latencies": [10.1, 11.2, 13.3, 14.4, 12.5]
+        }
+      }
+    }
+  ]
+}
+```
+
+**Example response (202 Accepted):**
+```json
+{
+  "submission_id": "019d6abc-0001-7000-8000-000000000001",
+  "accepted": 1,
+  "duplicates_skipped": 0,
+  "received_at": "2026-04-08T10:00:00.123Z"
+}
+```
+
 ### Future Endpoints
-(To be implemented based on OpenAPI specification)
-- Agent registration (`POST /agent/register`)
-- Agent status reporting (`POST /agent/report`)
-- Metrics submission and retrieval
-- Alert configuration
+- Alert configuration and management
 - User authentication and management
+- Report generation and export
 
 ## Contributing
+This is an open-source project, and we deeply value the community's interest. However, due to the high volume of automated and machine-generated code currently being submitted, we are significantly narrowing our intake process to maintain code quality and project stability.
 
-Contributions are welcome! Please follow these guidelines:
+### Current PR Policy
+To ensure our maintainers can focus on meaningful improvements:
 
-1. Fork the repository
-2. Create a feature branch (`git checkout -b feature/amazing-feature`)
-3. Make your changes
-4. Run tests and linting (`just all`)
-5. Commit your changes (`git commit -m 'Add amazing feature'`)
-6. Push to the branch (`git push origin feature/amazing-feature`)
-7. Open a Pull Request
+- **General Pull Requests:** We are currently not accepting unsolicited PRs, particularly those containing generated code.
+
+- **Exceptions:** Critical bug fixes or major feature enhancements are still considered on a case-by-case basis.
+
+- **CLA Requirement:** If an exception is made for your contribution, you must sign our Contributor License Agreement (CLA) before any code can be reviewed or merged.
+
+### How to Help
+If you’ve found a bug or have a great idea:
+
+- **Open an Issue:** Please start by searching existing issues or creating a new one to discuss your proposal.
+
+- **Wait for Feedback:** Do not spend time on a PR until a maintainer has greenlit the approach in the issue comments.
+
+- **Follow the Workflow:** Once approved, you may fork the repo, work in a feature branch, and submit your PR (with tests!) for final review.
+
+See the [User Guide](GUIDE.md) for testing requirements and code standards.
 
 ### Code Style
 - Follow standard Go conventions and idioms

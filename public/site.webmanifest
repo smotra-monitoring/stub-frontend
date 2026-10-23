@@ -1,0 +1,16 @@
+{
+    "name": "Smotra — Distributed Monitoring",
+    "short_name": "Smotra",
+    "start_url": "/",
+    "display": "standalone",
+    "background_color": "#05070f",
+    "theme_color": "#05070f",
+    "icons": [
+        {
+            "src": "/favicon.svg",
+            "sizes": "any",
+            "type": "image/svg+xml",
+            "purpose": "any"
+        }
+    ]
+}
